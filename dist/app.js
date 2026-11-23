@@ -23,55 +23,53 @@ function closePortfolio() {
 }
 portfolioOpen.addEventListener('click', openPortfolio);
 $('#portfolio-close').addEventListener('click', closePortfolio);
-function selectProfile(key, moveFocus = false) {
-  const buttons = [...$('#profile-specs').querySelectorAll('[data-profile]')];
-  buttons.forEach(button => {
-    const selected = button.dataset.profile === key;
-    button.classList.toggle('selected', selected);
-    button.setAttribute('aria-selected', String(selected));
-    button.tabIndex = selected ? 0 : -1;
-    if (selected && moveFocus) button.focus();
+const solutionPanel = $('#solution-panel');
+const profileSpecs = $('#profile-specs');
+const profilePanels = [...document.querySelectorAll('.profile-content')];
+
+function selectProfile(key) {
+  profileSpecs.querySelectorAll('[data-profile]').forEach(button => {
+    const expanded = button.dataset.profile === key;
+    button.classList.toggle('selected', expanded);
+    button.setAttribute('aria-expanded', String(expanded));
   });
-  ['s70', 's50', 'krls64', 'veka-euroline', 'veka-softline', 'veka-softline82'].forEach(profile => {
-    const panel = $(`#profile-${profile}-content`);
-    if (panel) panel.hidden = key !== profile;
+  profilePanels.forEach(panel => {
+    panel.hidden = panel.id !== `profile-${key}-content`;
   });
 }
-function selectSolution(key, moveFocus = false) {
+
+function selectSolution(key) {
   if (!Object.hasOwn(solutions, key)) return;
   currentSolution = key;
   const data = solutions[key];
   tabs.forEach(tab => {
     const selected = tab.dataset.solution === key;
     tab.classList.toggle('selected', selected);
-    tab.setAttribute('aria-selected', String(selected));
-    tab.tabIndex = selected ? 0 : -1;
-    if (selected && moveFocus) tab.focus();
+    tab.setAttribute('aria-expanded', String(selected));
   });
-  $('#solution-panel').setAttribute('aria-labelledby', `tab-${key}`);
+  solutionPanel.hidden = false;
+  solutionPanel.setAttribute('aria-labelledby', `tab-${key}`);
   $('#solution-image').src = data.image;
   $('#solution-image').alt = data.alt;
   $('#open-image').setAttribute('aria-label', `Рассмотреть: ${data.name.toLowerCase()}`);
   $('#solution-badge').textContent = data.badge;
   $('#solution-title').textContent = data.title;
   $('#solution-description').textContent = data.description;
-  const profileSpecs = $('#profile-specs');
   if (key === 'windows' || key === 'panorama') {
     const profileKeys = key === 'windows' ? ['s70', 's50', 'veka-euroline', 'veka-softline', 'veka-softline82'] : ['krls64'];
     profileSpecs.className = 'profile-specs profile-switch';
-    profileSpecs.setAttribute('role', 'tablist');
+    profileSpecs.setAttribute('role', 'group');
     profileSpecs.setAttribute('aria-label', key === 'windows' ? 'Профиль алюминиевых окон и дверей' : 'Системы раздвижных панорамных дверей');
     profileSpecs.replaceChildren(...data.profiles.map(([name, detail], index) => {
       const profileKey = profileKeys[index];
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'profile-option'; button.id = `profile-${profileKey}-tab`;
-      button.setAttribute('role', 'tab'); button.setAttribute('aria-controls', `profile-${profileKey}-content`);
+      button.setAttribute('aria-controls', `profile-${profileKey}-content`);
       button.dataset.profile = profileKey;
       const title = document.createElement('strong'); title.textContent = name;
       const info = document.createElement('span'); info.textContent = detail;
       button.append(title, info); return button;
     }));
-    selectProfile(profileKeys[0]);
   } else {
     profileSpecs.className = 'profile-specs';
     profileSpecs.removeAttribute('role'); profileSpecs.removeAttribute('aria-label');
@@ -81,41 +79,37 @@ function selectSolution(key, moveFocus = false) {
       const info = document.createElement('span'); info.textContent = detail;
       card.append(title, info); return card;
     }));
-    ['s70', 's50', 'krls64', 'veka-euroline', 'veka-softline', 'veka-softline82'].forEach(profile => {
-      const panel = $(`#profile-${profile}-content`);
-      if (panel) panel.hidden = true;
-    });
   }
+  selectProfile(null);
   $('#solution-tags').replaceChildren(...data.tags.map(label => {
     const span = document.createElement('span'); span.textContent = label; return span;
   }));
 }
-$('#profile-specs').addEventListener('click', event => {
+profileSpecs.addEventListener('click', event => {
   const button = event.target.closest('[data-profile]');
-  if (button) selectProfile(button.dataset.profile);
+  if (!button) return;
+  selectProfile(button.getAttribute('aria-expanded') === 'true' ? null : button.dataset.profile);
 });
-$('#profile-specs').addEventListener('keydown', event => {
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-  const buttons = [...$('#profile-specs').querySelectorAll('[data-profile]')];
-  const current = buttons.indexOf(event.target.closest('[data-profile]'));
-  if (current < 0 || buttons.length < 2) return;
-  event.preventDefault();
-  const next = (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-  selectProfile(buttons[next].dataset.profile, true);
-});
+
 tabs.forEach((tab, index) => {
-  tab.addEventListener('click', () => selectSolution(tab.dataset.solution));
+  tab.addEventListener('click', () => {
+    if (tab.getAttribute('aria-expanded') === 'true') {
+      tab.setAttribute('aria-expanded', 'false');
+      tab.classList.remove('selected');
+      solutionPanel.hidden = true;
+      selectProfile(null);
+      return;
+    }
+    selectSolution(tab.dataset.solution);
+  });
   tab.addEventListener('keydown', event => {
     let next;
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % tabs.length;
     if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
     if (event.key === 'Home') next = 0;
     if (event.key === 'End') next = tabs.length - 1;
-    if (next !== undefined) { event.preventDefault(); selectSolution(tabs[next].dataset.solution, true); }
+    if (next !== undefined) { event.preventDefault(); tabs[next].focus(); }
   });
-});
-document.querySelectorAll('[data-select]').forEach(link => {
-  link.addEventListener('click', () => selectSolution(link.dataset.select));
 });
 $('#solution-discuss').addEventListener('click', () => {
   const topic = $('#selected-topic');
